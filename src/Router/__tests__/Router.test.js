@@ -17,20 +17,24 @@ describe('Router init', () => {
         addEventListenerSpy.mockRestore();
     });
 
-    
-
-
 
     test('router 应该是个类', () => {
         const router = new Router();
-        expect(router.routes).toEqual({});
+        expect(router.routesMapper).toEqual(new Map());
         expect(router.currentComponent).toBeNull();
     });
 
     test('router.addRoute 成功', () => {
         const router = new Router();
         router.addRoute('/home', HELLO);
-        expect(router.routes).toEqual({ "/home": HELLO });
+        expect(router.routesMapper).toEqual(new Map([['/home', HELLO]]));
+    });
+
+    // router.addRoute 添加的应该是个动态url
+    test('router.addRoute 添加的应该是个动态url', () => {
+        const router = new Router();
+        router.addRoute('/home/:id', HELLO);
+        expect(router.routesMapper).toEqual(new Map([['/home/:id', HELLO]]));
     });
 
     // router.addRoute 接受的不是个组件
@@ -42,12 +46,7 @@ describe('Router init', () => {
     });
 
 
-    // router.addRoute 添加的应该是个动态url
-    test('router.addRoute 添加的应该是个动态url', () => {
-        const router = new Router();
-        router.addRoute('/home/:id', HELLO);
-        expect(router.routes).toEqual({ '/home/:id': HELLO });
-    });
+    
 
     // router 应该有navigate方法
     test('router 应该有navigate方法', () => {
@@ -62,13 +61,6 @@ describe('Router init', () => {
         expect(router.getCurrentComponent()).toEqual(HELLO);
     });
 
-    // // router.navigate 成功
-    // test('router.navigate 成功', async() => {
-    //     const router = new Router();
-    //     router.addRoute('home', HELLO);
-    //     await router.navigate('home');
-    //     expect(router.currentComponent).toEqual(HELLO);
-    // });
 
     // router 应该可以设置history模式
     test('router 应该可以设置history模式', () => {
@@ -93,8 +85,19 @@ describe('Router init', () => {
     });
 
 
-    // routerchange 方法 改变渲染组件
+    // router 匹配动态路由
+    test('router 匹配动态路由', () => {
+        const router = new Router();
+        router.addRoute('/home/:id', HELLO);
+        expect(router.matchTargetUrl('/home/1')).toBe('/home/:id');
+    });
     
+    // router 匹配不上则返回 /404
+    test('router 匹配不上则返回 /404', () => {
+        const router = new Router();
+        router.addRoute('/home', HELLO);
+        expect(router.matchTargetUrl('/333')).toBe('/404');
+    });
     
 
 });
