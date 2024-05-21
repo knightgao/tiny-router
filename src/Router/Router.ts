@@ -7,12 +7,13 @@ class Router {
     beforeHooks: any[] = [];
     afterHooks: any[] = [];
     
-    constructor({ mode = 'history'}={}) {
+    constructor({ mode = 'history',routes=[]}={}) {
         this.routesMapper = new Map();
         this.currentComponent = null;
         this.currentUrl = ""; // Add the currentUrl property
         this.mode = mode;
         this.init();
+        this.initRoutes(routes);
     }
 
     init() {
@@ -26,6 +27,12 @@ class Router {
                 await this.routeChanged();
             });
         }
+    }
+
+    initRoutes(routes: any[]) {
+        routes.forEach(route => {
+            this.addRoute(route.path, route.component);
+        });
     }
 
     beforeEach(hook: (from: string, to: string) => Promise<void>) {

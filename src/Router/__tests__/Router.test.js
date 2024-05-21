@@ -98,6 +98,13 @@ describe('Router init', () => {
         router.addRoute('/home', HELLO);
         expect(router.matchTargetUrl('/333')).toBe('/404');
     });
+
+
+    // router 可以配置路由列表
+    test('router 可以配置路由列表', () => {
+        const router = new Router({ routes: [{ path: '/home', component: HELLO }] });
+        expect(router.routesMapper).toEqual(new Map([['/home', HELLO]]));
+    });
     
 
 });
