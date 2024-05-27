@@ -71,16 +71,16 @@ class Router {
         if (this.mode === 'history') {
             window.history.pushState({}, '', path);
         } else if (this.mode === 'hash') {
-            window.location.hash = path;
+            window.location.hash = path || '/';
         }
         await this.onRouteChange();
     }
-
+    
     async replace(path: string) {
         if (this.mode === 'history') {
             window.history.replaceState({}, '', path);
         } else if (this.mode === 'hash') {
-            const newHash = '#' + path;
+            const newHash = '#' + (path || '/');
             window.location.replace(window.location.pathname + window.location.search + newHash);
         }
         await this.onRouteChange();
@@ -146,9 +146,11 @@ class Router {
 
     getCurrentPath(): string {
         if (this.mode === 'history') {
-            return window.location.pathname || '/';
+            const path = window.location.pathname;
+            return path === '' || path === '/' ? '/' : path;
         } else if (this.mode === 'hash') {
-            return window.location.hash.slice(1) || '/';
+            const hash = window.location.hash.slice(1);
+            return hash === '' ? '/' : hash;
         }
         return '/';
     }

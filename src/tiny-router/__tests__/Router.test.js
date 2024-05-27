@@ -1,139 +1,254 @@
 import Router from "../Router.ts";
-import { describe, it, expect, beforeEach, afterEach, vi, test } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
 // 模拟一个 Vue 组件
 const HELLO = { template: '<div>Hello World</div>' };
 
-describe('Router init', () => {
-
+describe('路由初始化', () => {
     let addEventListenerSpy;
+    let originalPathname;
+    let originalHash;
 
     beforeEach(() => {
-        // 使用 vi.spyOn 监控 window.addEventListener 方法
+        originalPathname = window.location.pathname;
+        originalHash = window.location.hash;
         addEventListenerSpy = vi.spyOn(window, 'addEventListener');
     });
 
     afterEach(() => {
-        // 在每个测试后还原 spy
+        window.history.pushState({}, '', originalPathname);
+        window.location.hash = originalHash;
         addEventListenerSpy.mockRestore();
     });
 
-    test('router 应该是个类', () => {
+    it('路由构造函数默认值', () => {
         const router = new Router();
-        expect(router.routes).toEqual(new Map());
-        expect(router.currentComponent.value).toBeNull();
+        expect(router.mode).toBe('history');
+        expect(router.routes.size).toBe(0);
     });
 
-    test('router.addRoute 成功', () => {
+    it('路由构造函数自定义值', () => {
+        const routes = [{ path: '/home', component: HELLO }];
+        const router = new Router({ mode: 'hash', routes });
+        expect(router.mode).toBe('hash');
+        expect(router.routes.size).toBe(1);
+    });
+
+    it('处理路由变化时调用错误处理程序', async () => {
+        const router = new Router();
+        const errorHandler = vi.fn();
+        const error = new Error('测试错误');
+
+        router.onError(errorHandler);
+        router.beforeEach(() => { throw error; });
+
+        await router.handleRouteChange('/home');
+
+        expect(errorHandler).toHaveBeenCalledWith(error);
+    });
+
+    it('readyResolve 在路由变化后应只调用一次', async () => {
+        const router = new Router();
+        const readyResolveSpy = vi.spyOn(router, 'readyResolve');
+
+        router.addRoute('/home', HELLO);
+        await router.push('/home');
+
+        expect(readyResolveSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('convertToRegex 应该正确转换动态路由', () => {
+        const router = new Router();
+        const regex = router.convertToRegex('/home/:id');
+        expect(regex).toBe('/home/([^\\s/]+)');
+    });
+
+    it('getCurrentPath 在不同模式下应返回正确路径', () => {
+        const routerHistory = new Router({ mode: 'history' });
+        window.history.pushState({}, '', '/home');
+        expect(routerHistory.getCurrentPath()).toBe('/home');
+
+        const routerHash = new Router({ mode: 'hash' });
+        window.location.hash = '#/home';
+        expect(routerHash.getCurrentPath()).toBe('/home');
+    });
+
+    it('install 应该将路由器注入 Vue 应用', () => {
+        const app = { config: { globalProperties: {} }, provide: vi.fn() };
+        const router = new Router();
+        router.install(app);
+        expect(app.config.globalProperties.$router).toBe(router);
+        expect(app.provide).toHaveBeenCalledWith('router', router);
+    });
+
+    it('init 方法应设置事件监听器并调用 onRouteChange', async () => {
+        const routerHistory = new Router({ mode: 'history' });
+        expect(addEventListenerSpy).toHaveBeenCalledWith('popstate', expect.any(Function));
+
+        const routerHash = new Router({ mode: 'hash' });
+        expect(addEventListenerSpy).toHaveBeenCalledWith('hashchange', expect.any(Function));
+
+        const onRouteChangeSpy = vi.spyOn(routerHistory, 'onRouteChange');
+        await routerHistory.init();
+        expect(onRouteChangeSpy).toHaveBeenCalled();
+    });
+
+    it('matchRouteComponent 对于未匹配的路径应返回 null', () => {
+        const router = new Router();
+        expect(router.matchRouteComponent('/unknown')).toBeNull();
+    });
+
+    it('在路由变化时 currentComponent 应该更新', async () => {
+        const router = new Router();
+        router.addRoute('/home', HELLO);
+        await router.push('/home');
+        expect(router.currentComponent.value).toEqual(HELLO);
+    });
+
+    it('isReady 应该在路由变化后解析', async () => {
+        const router = new Router();
+        const readyPromise = router.isReady();
+        await router.push('/home');
+        await expect(readyPromise).resolves.toBeUndefined();
+    });
+
+    it('测试 navigation 方法（go, back, forward）', () => {
+        const router = new Router();
+        const goSpy = vi.spyOn(window.history, 'go');
+        const backSpy = vi.spyOn(window.history, 'back');
+        const forwardSpy = vi.spyOn(window.history, 'forward');
+
+        router.go(1);
+        expect(goSpy).toHaveBeenCalledWith(1);
+
+        router.back();
+        expect(backSpy).toHaveBeenCalled();
+
+        router.forward();
+        expect(forwardSpy).toHaveBeenCalled();
+    });
+
+    it('router.addRoute 应该成功添加路由', () => {
         const router = new Router();
         router.addRoute('/home', HELLO);
         expect(router.routes).toEqual(new Map([['/home', HELLO]]));
     });
 
-    // router.addRoute 添加的应该是个动态url
-    test('router.addRoute 添加的应该是个动态url', () => {
-        const router = new Router();
-        router.addRoute('/home/:id', HELLO);
-        expect(router.routes).toEqual(new Map([['/home/:id', HELLO]]));
-    });
-
-    // router.addRoute 接受的不是个组件
-    test('router.addRoute 接受的不是个组件', () => {
+    it('router.addRoute 接受的不是个组件', () => {
         const router = new Router();
         expect(() => {
             router.addRoute('/home', 'HELLO');
         }).toThrowError('component is not a Vue component');
     });
 
-    // router 应该有push方法
-    test('router 应该有push方法', () => {
-        const router = new Router();
-        expect(router.push).toBeDefined();
-    });
-
-    test('router.push 成功', async () => {
+    it('router.push 和 replace 方法应更新路径并调用 onRouteChange', async () => {
         const router = new Router();
         router.addRoute('/home', HELLO);
+        const onRouteChangeSpy = vi.spyOn(router, 'onRouteChange');
+
         await router.push('/home');
-        expect(router.getCurrentComponent().value).toEqual(HELLO);
+        expect(router.getCurrentPath()).toBe('/home');
+        expect(onRouteChangeSpy).toHaveBeenCalled();
+
+        await router.replace('/home');
+        expect(router.getCurrentPath()).toBe('/home');
+        expect(onRouteChangeSpy).toHaveBeenCalled();
     });
 
-    // router 应该可以设置history模式
-    test('router 应该可以设置history模式', () => {
-        const router = new Router({ mode: 'history' });
-        expect(router.mode).toBe('history');
-    });
-
-    // 监听路由变化 history模式 popstate
-    it('应该可以监听 popstate 事件', () => {
-        new Router({ mode: 'history' });
-        expect(addEventListenerSpy).toHaveBeenCalledWith('popstate', expect.any(Function));
-    });
-
-    // 监听路由变化 hash模式 hashchange
-    it('应该可以监听 hashchange 事件', () => {
-        new Router({ mode: 'hash' });
-        expect(addEventListenerSpy).toHaveBeenCalledWith('hashchange', expect.any(Function));
-    });
-
-    // router 匹配动态路由
-    test('router 匹配动态路由', () => {
-        const router = new Router();
-        router.addRoute('/home/:id', HELLO);
-        expect(router.matchTargetUrl('/home/1')).toBe('/home/:id');
-    });
-
-    // router 匹配不上则返回 /404
-    test('router 匹配不上则返回 /404', () => {
-        const router = new Router();
-        router.addRoute('/home', HELLO);
-        expect(router.matchTargetUrl('/333')).toBe('/404');
-    });
-
-    // router 可以配置路由列表
-    test('router 可以配置路由列表', () => {
-        const router = new Router({ routes: [{ path: '/home', component: HELLO }] });
-        expect(router.routes).toEqual(new Map([['/home', HELLO]]));
-    });
-
-    // router 应该有replace方法
-    test('router 应该有replace方法', () => {
-        const router = new Router();
-        expect(router.replace).toBeDefined();
-    });
-
-    test('router.replace 成功', async () => {
+    it('router.replace 成功', async () => {
         const router = new Router();
         router.addRoute('/home', HELLO);
         await router.replace('/home');
         expect(router.getCurrentComponent().value).toEqual(HELLO);
     });
 
-    // router 应该有back方法
-    test('router 应该有back方法', () => {
+    it('钩子执行顺序应该是 beforeEach -> beforeResolve -> afterEach', async () => {
         const router = new Router();
-        expect(router.back).toBeDefined();
+        const callOrder = [];
+
+        router.beforeEach(() => { callOrder.push('beforeEach'); return Promise.resolve(); });
+        router.beforeResolve(() => { callOrder.push('beforeResolve'); return Promise.resolve(); });
+        router.afterEach(() => { callOrder.push('afterEach'); return Promise.resolve(); });
+
+        router.addRoute('/home', HELLO);
+        await router.push('/home');
+
+        expect(callOrder).toEqual(['beforeEach', 'beforeResolve', 'afterEach']);
     });
 
-    // router 应该有forward方法
-    test('router 应该有forward方法', () => {
+    it('onRouteChange 应该正确处理当前路径和未匹配路径', async () => {
         const router = new Router();
-        expect(router.forward).toBeDefined();
+        router.addRoute('/home', HELLO);
+
+        window.history.pushState({}, '', '/home');
+        await router.onRouteChange();
+        expect(router.currentRoute.value).toBe('/home');
+        expect(router.currentComponent.value).toBe(HELLO);
+
+        window.history.pushState({}, '', '/unknown');
+        await router.onRouteChange();
+        expect(router.currentRoute.value).toBe('/404');
     });
 
-    // router 应该有go方法
-    test('router 应该有go方法', () => {
-        const router = new Router();
-        expect(router.go).toBeDefined();
+    it('getCurrentPath 方法在未定义模式下应返回根路径', () => {
+        const router = new Router({ mode: 'invalid' });
+        expect(router.getCurrentPath()).toBe('/');
     });
 
-    // router 应该有go方法
-    test('router 应该有go方法', () => {
-        const router = new Router();
-        expect(router.go).toBeDefined();
+    it('push 和 replace 方法在 hash 模式下应更新 hash 并调用 onRouteChange', async () => {
+        const router = new Router({ mode: 'hash' });
+        router.addRoute('/home', HELLO);
+        const onRouteChangeSpy = vi.spyOn(router, 'onRouteChange');
+
+        await router.push('/home');
+        expect(window.location.hash).toBe('#/home');
+        expect(onRouteChangeSpy).toHaveBeenCalled();
+
+        await router.replace('/home');
+        expect(window.location.hash).toBe('#/home');
+        expect(onRouteChangeSpy).toHaveBeenCalled();
     });
 
-    // 测试 beforeResolve 钩子
-    test('beforeResolve 钩子应该在导航前执行', async () => {
+    it('push 和 replace 方法在 hash 模式下应正确处理空 hash', async () => {
+        const router = new Router({ mode: 'hash' });
+        const onRouteChangeSpy = vi.spyOn(router, 'onRouteChange');
+
+        await router.push('');
+        expect(window.location.hash).toBe('#/');
+        expect(onRouteChangeSpy).toHaveBeenCalled();
+
+        await router.replace('');
+        expect(window.location.hash).toBe('#/');
+        expect(onRouteChangeSpy).toHaveBeenCalled();
+    });
+
+    it('构造函数应该调用 addRoutes 方法', () => {
+        const addRoutesSpy = vi.spyOn(Router.prototype, 'addRoutes');
+        new Router({ routes: [{ path: '/home', component: HELLO }] });
+        expect(addRoutesSpy).toHaveBeenCalled();
+        addRoutesSpy.mockRestore();
+    });
+
+    it('调用 addRoutes 方法时应该添加所有路由', () => {
+        const router = new Router();
+        const routes = [{ path: '/home', component: HELLO }, { path: '/about', component: HELLO }];
+        router.addRoutes(routes);
+        expect(router.routes.size).toBe(2);
+        expect(router.routes.get('/home')).toBe(HELLO);
+        expect(router.routes.get('/about')).toBe(HELLO);
+    });
+
+    it('readyResolve 在 handleRouteChange 方法中应被调用', async () => {
+        const router = new Router();
+        const readyResolveSpy = vi.spyOn(router, 'readyResolve');
+
+        router.addRoute('/home', HELLO);
+        await router.push('/home');
+
+        expect(readyResolveSpy).toHaveBeenCalled();
+    });
+
+    it('测试 beforeResolve 钩子', async () => {
         const router = new Router();
         const beforeResolveHook = vi.fn().mockResolvedValue(undefined);
 
@@ -145,15 +260,14 @@ describe('Router init', () => {
         expect(beforeResolveHook).toHaveBeenCalled();
     });
 
-    // 测试 onError 钩子
-    test('onError 钩子应该在导航错误时执行', async () => {
+    it('测试 onError 钩子', async () => {
         const router = new Router();
         const errorHook = vi.fn();
 
         router.addRoute('/home', HELLO);
         router.onError(errorHook);
 
-        const error = new Error('Test Error');
+        const error = new Error('测试错误');
         router.beforeEach(() => {
             throw error;
         });
@@ -161,33 +275,5 @@ describe('Router init', () => {
         await router.push('/home');
 
         expect(errorHook).toHaveBeenCalledWith(error);
-    });
-
-    // 测试 beforeEach, beforeResolve 和 afterEach 钩子执行顺序
-    test('钩子执行顺序应该是 beforeEach -> beforeResolve -> afterEach', async () => {
-        const router = new Router();
-        const callOrder = [];
-
-        const beforeEachHook = vi.fn().mockImplementation(() => {
-            callOrder.push('beforeEach');
-            return Promise.resolve();
-        });
-        const beforeResolveHook = vi.fn().mockImplementation(() => {
-            callOrder.push('beforeResolve');
-            return Promise.resolve();
-        });
-        const afterEachHook = vi.fn().mockImplementation(() => {
-            callOrder.push('afterEach');
-            return Promise.resolve();
-        });
-
-        router.addRoute('/home', HELLO);
-        router.beforeEach(beforeEachHook);
-        router.beforeResolve(beforeResolveHook);
-        router.afterEach(afterEachHook);
-
-        await router.push('/home');
-
-        expect(callOrder).toEqual(['beforeEach', 'beforeResolve', 'afterEach']);
     });
 });
