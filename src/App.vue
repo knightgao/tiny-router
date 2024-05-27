@@ -1,10 +1,25 @@
+<script setup>
+import RouterLink from './Router/components/RouterLink.vue';
+import RouterView from './Router/components/RouterView.vue';
+</script>
+
 <template>
-  <div>
-      app.vue
-    <!-- <nav>
-      <a href="#" @click.prevent="navigate('/')">Home</a>
-      <a href="#" @click.prevent="navigate('/about')">About</a>
+  <div id="app">
+    <nav>
+      <RouterLink to="/" text="Home"></RouterLink>
+      <RouterLink to="/about" text="About"></RouterLink>
     </nav>
-    <component :is="currentComponent" /> -->
+    <RouterView />
   </div>
 </template>
+
+
+
+<style>
+nav {
+  margin-bottom: 20px;
+}
+nav a {
+  margin: 0 10px;
+}
+</style>

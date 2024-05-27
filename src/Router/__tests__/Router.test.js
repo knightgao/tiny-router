@@ -20,7 +20,7 @@ describe('Router init', () => {
     test('router 应该是个类', () => {
         const router = new Router();
         expect(router.routes).toEqual(new Map());
-        expect(router.currentComponent).toBeNull();
+        expect(router.currentComponent.value).toBeNull();
     });
 
     test('router.addRoute 成功', () => {
@@ -54,7 +54,7 @@ describe('Router init', () => {
         const router = new Router();
         router.addRoute('/home', HELLO);
         await router.push('/home');
-        expect(router.getCurrentComponent()).toEqual(HELLO);
+        expect(router.getCurrentComponent().value).toEqual(HELLO);
     });
 
     // router 应该可以设置history模式
@@ -105,7 +105,7 @@ describe('Router init', () => {
         const router = new Router();
         router.addRoute('/home', HELLO);
         await router.replace('/home');
-        expect(router.getCurrentComponent()).toEqual(HELLO);
+        expect(router.getCurrentComponent().value).toEqual(HELLO);
     });
 
     // router 应该有back方法

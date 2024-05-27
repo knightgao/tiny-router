@@ -1,9 +1,9 @@
-import { type App } from 'vue';
+import { type App, shallowRef } from 'vue';
 
 class Router {
-    currentRoute: string;
-    routes: Map<string, any>;
-    currentComponent: any;
+    currentRoute = shallowRef<string>('');
+    routes = new Map<string, any>();
+    currentComponent = shallowRef<any>(null);
     mode: string;
     beforeGuards: any[] = [];
     beforeResolveGuards: any[] = [];
@@ -12,10 +12,7 @@ class Router {
     readyPromise: Promise<void>;
     readyResolve!: () => void;
 
-    constructor({ mode = 'history', routes = [] } = {}) {
-        this.routes = new Map();
-        this.currentComponent = null;
-        this.currentRoute = "";
+    constructor({ mode = 'history', routes = [] }: { mode?: string, routes?: any[] } = {}) {
         this.mode = mode;
         this.readyPromise = new Promise((resolve) => {
             this.readyResolve = resolve;
@@ -109,15 +106,15 @@ class Router {
     }
 
     async handleRouteChange(path: string) {
-        const from = this.currentRoute;
+        const from = this.currentRoute.value;
         const to = path;
 
         try {
             for (const hook of this.beforeGuards) await hook(from, to);
             for (const hook of this.beforeResolveGuards) await hook(from, to);
 
-            this.currentRoute = path;
-            this.currentComponent = this.matchRouteComponent(path);
+            this.currentRoute.value = path;
+            this.currentComponent.value = this.matchRouteComponent(path);
 
             for (const hook of this.afterGuards) await hook(from, to);
 
