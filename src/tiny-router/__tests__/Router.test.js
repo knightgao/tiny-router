@@ -88,9 +88,12 @@ describe('路由初始化', () => {
         const routerHash = new Router({ mode: 'hash' });
         expect(addEventListenerSpy).toHaveBeenCalledWith('hashchange', expect.any(Function));
 
-        const onRouteChangeSpy = vi.spyOn(routerHistory, 'onRouteChange');
+        const onRouteChangeSpyHistory = vi.spyOn(routerHistory, 'onRouteChange');
+        const onRouteChangeSpyHash = vi.spyOn(routerHash, 'onRouteChange');
         await routerHistory.init();
-        expect(onRouteChangeSpy).toHaveBeenCalled();
+        await routerHash.init();
+        expect(onRouteChangeSpyHistory).toHaveBeenCalled();
+        expect(onRouteChangeSpyHash).toHaveBeenCalled();
     });
 
     it('matchRouteComponent 对于未匹配的路径应返回 null', () => {
