@@ -1,6 +1,6 @@
 <script setup>
-import RouterLink from './Router/components/RouterLink.vue';
-import RouterView from './Router/components/RouterView.vue';
+import RouterLink from './tiny-router/components/RouterLink.vue';
+import RouterView from './tiny-router/components/RouterView.vue';
 </script>
 
 <template>
