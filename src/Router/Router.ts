@@ -1,99 +1,141 @@
+import { type App } from 'vue';
 
 class Router {
-    currentUrl: string;
-    routesMapper: Map<string, any>;
-    currentComponent: null;
+    currentRoute: string;
+    routes: Map<string, any>;
+    currentComponent: any;
     mode: string;
-    beforeHooks: any[] = [];
-    afterHooks: any[] = [];
-    
-    constructor({ mode = 'history',routes=[]}={}) {
-        this.routesMapper = new Map();
+    beforeGuards: any[] = [];
+    beforeResolveGuards: any[] = [];
+    afterGuards: any[] = [];
+    errorHandlers: any[] = [];
+    readyPromise: Promise<void>;
+    readyResolve!: () => void;
+
+    constructor({ mode = 'history', routes = [] } = {}) {
+        this.routes = new Map();
         this.currentComponent = null;
-        this.currentUrl = ""; // Add the currentUrl property
+        this.currentRoute = "";
         this.mode = mode;
+        this.readyPromise = new Promise((resolve) => {
+            this.readyResolve = resolve;
+        });
         this.init();
-        this.initRoutes(routes);
+        this.addRoutes(routes);
     }
 
     init() {
-        // 两个事件就可以监听路由的变化了
         if (this.mode === 'history') {
             window.addEventListener('popstate', async () => {
-                await this.routeChanged();
+                await this.onRouteChange();
             });
         } else if (this.mode === 'hash') {
             window.addEventListener('hashchange', async () => {
-                await this.routeChanged();
+                await this.onRouteChange();
             });
         }
+        this.onRouteChange(); // Initialize the first route
     }
 
-    initRoutes(routes: any[]) {
+    addRoutes(routes: any[]) {
         routes.forEach(route => {
             this.addRoute(route.path, route.component);
         });
     }
 
     beforeEach(hook: (from: string, to: string) => Promise<void>) {
-        this.beforeHooks.push(hook);
+        this.beforeGuards.push(hook);
     }
 
-    afterEach(hook: (from: string,to: string) => Promise<void>) {
-        this.afterHooks.push(hook);
+    beforeResolve(hook: (from: string, to: string) => Promise<void>) {
+        this.beforeResolveGuards.push(hook);
     }
 
-    addRoute(path:string, component: any) {
+    afterEach(hook: (from: string, to: string) => Promise<void>) {
+        this.afterGuards.push(hook);
+    }
+
+    onError(handler: (error: Error) => void) {
+        this.errorHandlers.push(handler);
+    }
+
+    isReady(): Promise<void> {
+        return this.readyPromise;
+    }
+
+    addRoute(path: string, component: any) {
         if (typeof component !== 'object') {
             throw new Error('component is not a Vue component');
         }
-        this.routesMapper.set(path, component);
+        this.routes.set(path, component);
     }
 
-    async navigate(path: string) {
+    async push(path: string) {
         if (this.mode === 'history') {
             window.history.pushState({}, '', path);
         } else if (this.mode === 'hash') {
             window.location.hash = path;
         }
-        await this.routeChanged();
+        await this.onRouteChange();
     }
 
-    async routeChanged() {
+    async replace(path: string) {
+        if (this.mode === 'history') {
+            window.history.replaceState({}, '', path);
+        } else if (this.mode === 'hash') {
+            const newHash = '#' + path;
+            window.location.replace(window.location.pathname + window.location.search + newHash);
+        }
+        await this.onRouteChange();
+    }
+
+    back() {
+        window.history.back();
+    }
+
+    forward() {
+        window.history.forward();
+    }
+
+    go(delta: number) {
+        window.history.go(delta);
+    }
+
+    async onRouteChange() {
         const path = this.getCurrentPath();
-        // 提前处理一下路径
         const targetPath = this.matchTargetUrl(path);
 
         await this.handleRouteChange(targetPath);
     }
 
-    async handleRouteChange(path:string) {
-        const from = this.currentUrl;
+    async handleRouteChange(path: string) {
+        const from = this.currentRoute;
         const to = path;
 
-        console.log("from", from)
-        console.log("to", to)
+        try {
+            for (const hook of this.beforeGuards) await hook(from, to);
+            for (const hook of this.beforeResolveGuards) await hook(from, to);
 
-        for (const hook of this.beforeHooks) await hook(from, to);
+            this.currentRoute = path;
+            this.currentComponent = this.matchRouteComponent(path);
 
-        // 更新路径
-        this.currentUrl = path;
-        // 更新组件
-        this.currentComponent = this.matchRouteComponent(path);
+            for (const hook of this.afterGuards) await hook(from, to);
 
-        for (const hook of this.afterHooks) await hook(from,to);
+            this?.readyResolve();
+        } catch (error) {
+            for (const handler of this.errorHandlers) handler(error);
+        }
     }
 
     matchTargetUrl(path: string) {
-        const routesMapper = Array.from(this.routesMapper.keys());
-        for (const route of routesMapper) {
+        const routes = Array.from(this.routes.keys());
+        for (const route of routes) {
             const regex = new RegExp(`^${this.convertToRegex(route)}$`);
             const match = path.match(regex);
             if (match) {
                 return route;
             }
         }
-        // 匹配不上返回404
         return '/404';
     }
 
@@ -102,7 +144,7 @@ class Router {
     }
 
     matchRouteComponent(path: string) {
-        return this.routesMapper.get(path);
+        return this.routes.get(path) || null;
     }
 
     getCurrentPath(): string {
@@ -116,6 +158,12 @@ class Router {
 
     getCurrentComponent() {
         return this.currentComponent;
+    }
+
+    install(app: App) {
+        app.config.globalProperties.$router = this;
+        app.provide('router', this);
+        this.onRouteChange(); // Initialize the first route
     }
 }
 

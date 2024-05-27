@@ -15,7 +15,7 @@ describe('Router', () => {
         { path: '/search/:query?', component: HELLO },
         { path: '/departments/:departmentId/employees/:employeeId', component: HELLO }
       ];
-      router = new Router({routes:routes,modes:'history'});
+      router = new Router({ routes: routes, mode: 'history' });
     });
   
     it('should match basic route', () => {
@@ -45,4 +45,4 @@ describe('Router', () => {
     it('should match route with departmentId and employeeId parameters', () => {
       expect(router.matchTargetUrl('/departments/001/employees/002')).toBe('/departments/:departmentId/employees/:employeeId');
     });
-  });
+});
