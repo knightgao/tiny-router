@@ -3,7 +3,7 @@
 </template>
 
 <script setup>
-import { defineProps, inject } from 'vue';
+import { inject } from 'vue';
 
 // 定义组件的 props
 const props = defineProps({
