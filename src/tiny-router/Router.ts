@@ -1,4 +1,6 @@
 import { type App, shallowRef } from 'vue';
+import RouterLink from './components/RouterLink.vue';
+import RouterView from './components/RouterView.vue';
 
 class Router {
     currentRoute = shallowRef<string>('');
@@ -21,6 +23,19 @@ class Router {
         this.addRoutes(routes);
     }
 
+    addRoutes(routes: any[]) {
+        routes.forEach(route => {
+            this.addRoute(route.path, route.component);
+        });
+    }
+
+    addRoute(path: string, component: any) {
+        if (typeof component !== 'object') {
+            throw new Error('component is not a Vue component');
+        }
+        this.routes.set(path, component);
+    }
+
     init() {
         if (this.mode === 'history') {
             window.addEventListener('popstate', async () => {
@@ -34,11 +49,7 @@ class Router {
         this.onRouteChange(); // Initialize the first route
     }
 
-    addRoutes(routes: any[]) {
-        routes.forEach(route => {
-            this.addRoute(route.path, route.component);
-        });
-    }
+    
 
     beforeEach(hook: (from: string, to: string) => Promise<void>) {
         this.beforeGuards.push(hook);
@@ -60,12 +71,7 @@ class Router {
         return this.readyPromise;
     }
 
-    addRoute(path: string, component: any) {
-        if (typeof component !== 'object') {
-            throw new Error('component is not a Vue component');
-        }
-        this.routes.set(path, component);
-    }
+    
 
     async push(path: string) {
         if (this.mode === 'history') {
@@ -162,6 +168,8 @@ class Router {
     install(app: App) {
         app.config.globalProperties.$router = this;
         app.provide('router', this);
+        app.component('RouterLink', RouterLink);
+        app.component('RouterView', RouterView);
         this.onRouteChange(); // Initialize the first route
     }
 }
