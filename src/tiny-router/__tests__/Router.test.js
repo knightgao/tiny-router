@@ -74,7 +74,7 @@ describe('路由初始化', () => {
     });
 
     it('install 应该将路由器注入 Vue 应用', () => {
-        const app = { config: { globalProperties: {} }, provide: vi.fn() };
+        const app = { config: { globalProperties: {} }, provide: vi.fn(),component: vi.fn()};
         const router = new Router();
         router.install(app);
         expect(app.config.globalProperties.$router).toBe(router);
